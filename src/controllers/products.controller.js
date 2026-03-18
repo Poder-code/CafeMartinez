@@ -58,16 +58,38 @@ const createProduct = async(req, res) => {
             resolvedCategoryName = cat.name;
         }
 
+        // Parse variations safely for create product too
+        let parsedVariations = null;
+        if (data.variations) {
+            try {
+                parsedVariations = JSON.parse(data.variations);
+                // Validate variations structure
+                if (Array.isArray(parsedVariations)) {
+                    parsedVariations = parsedVariations.filter(v => 
+                        v && typeof v === 'object' && 
+                        (v.size !== undefined || v.nombre !== undefined) && 
+                        (v.price !== undefined || v.precio !== undefined)
+                    ).map(v => ({
+                        size: v.size || v.nombre || '',
+                        price: v.price !== undefined ? Number(v.price) : Number(v.precio) || 0
+                    }));
+                }
+            } catch (parseError) {
+                console.error("Error parsing variations in create:", parseError);
+                return res.sendBadRequest("Formato de variaciones inválido");
+            }
+        }
+
         const newProduct = {
             title: data.title,
             description: data.description,
             code: data.code,
-            price: Number(data.price), // 
+            price: data.price !== undefined && data.price !== "" ? Number(data.price) : 0,
             category: resolvedCategoryName,
             categoryId: resolvedCategoryId,
             subcategoryId: resolvedSubcategoryId,
             status: data.status === "true" || data.status === true,
-            variations: data.variations ? JSON.parse(data.variations) : null,
+            variations: parsedVariations,
             image: req.file ? req.file.filename : null,
         };
 
@@ -91,45 +113,71 @@ const createProduct = async(req, res) => {
 const updateProduct = async(req, res) => {
     const { pid } = req.params;
     const data = req.body;
-    const update = {
-        title: data.title,
-        description: data.description,
-        code: data.code,
-        price: data.price !== undefined ? Number(data.price) : undefined,
-        image: req.file ? req.file.filename : data.image, // 
-        status: data.status === "true" || data.status === true,
-        variations: data.variations ? JSON.parse(data.variations) : undefined,
-    };
-    // Si se envía jerarquía, validar y resolver nombre y refs
-    if (data.categoryId || data.subcategoryId) {
-        if (data.subcategoryId) {
-            const sub = await SubcategoriesService.getSubcategoryById(data.subcategoryId);
-            if (!sub) return res.sendBadRequest("Subcategoría inválida");
-            const cat = await CategoriesService.getCategoryById(sub.categoryId);
-            if (!cat) return res.sendBadRequest("Categoría padre inválida");
-            update.subcategoryId = data.subcategoryId;
-            update.categoryId = String(sub.categoryId);
-            update.category = cat.name;
-        } else if (data.categoryId) {
-            const cat = await CategoriesService.getCategoryById(data.categoryId);
-            if (!cat) return res.sendBadRequest("Categoría inválida");
-            update.subcategoryId = null;
-            update.categoryId = data.categoryId;
-            update.category = cat.name;
-        }
-    } else if (data.category) {
-        // Compatibilidad: si solo llega string category, intentamos mantenerlo tal cual
-        update.category = data.category;
-    }
-    if (data.removeImage) {
-        update.image = null;
-    }
+    
     try {
+        // Parse variations safely
+        let parsedVariations = undefined;
+        if (data.variations) {
+            try {
+                parsedVariations = JSON.parse(data.variations);
+                // Validate variations structure
+                if (Array.isArray(parsedVariations)) {
+                    parsedVariations = parsedVariations.filter(v => 
+                        v && typeof v === 'object' && 
+                        (v.size !== undefined || v.nombre !== undefined) && 
+                        (v.price !== undefined || v.precio !== undefined)
+                    ).map(v => ({
+                        size: v.size || v.nombre || '',
+                        price: v.price !== undefined ? Number(v.price) : Number(v.precio) || 0
+                    }));
+                }
+            } catch (parseError) {
+                console.error("Error parsing variations:", parseError);
+                return res.sendBadRequest("Formato de variaciones inválido");
+            }
+        }
+        
+        const update = {
+            title: data.title,
+            description: data.description,
+            code: data.code,
+            price: data.price !== undefined && data.price !== "" ? Number(data.price) : undefined,
+            image: req.file ? req.file.filename : data.image,
+            status: data.status === "true" || data.status === true,
+            variations: parsedVariations,
+        };
+        
+        // Si se envía jerarquía, validar y resolver nombre y refs
+        if (data.categoryId || data.subcategoryId) {
+            if (data.subcategoryId) {
+                const sub = await SubcategoriesService.getSubcategoryById(data.subcategoryId);
+                if (!sub) return res.sendBadRequest("Subcategoría inválida");
+                const cat = await CategoriesService.getCategoryById(sub.categoryId);
+                if (!cat) return res.sendBadRequest("Categoría padre inválida");
+                update.subcategoryId = data.subcategoryId;
+                update.categoryId = String(sub.categoryId);
+                update.category = cat.name;
+            } else if (data.categoryId) {
+                const cat = await CategoriesService.getCategoryById(data.categoryId);
+                if (!cat) return res.sendBadRequest("Categoría inválida");
+                update.subcategoryId = null;
+                update.categoryId = data.categoryId;
+                update.category = cat.name;
+            }
+        } else if (data.category) {
+            // Compatibilidad: si solo llega string category, intentamos mantenerlo tal cual
+            update.category = data.category;
+        }
+        if (data.removeImage) {
+            update.image = null;
+        }
+        
         const updatedProduct = await ProductsService.updateProduct(pid, update);
         if (!updatedProduct) return res.sendServerError("No se pudo actualizar el producto");
         return res.sendPayload("Producto actualizado exitosamente", updatedProduct);
     } catch (err) {
-        return res.sendServerError("Error al actualizar producto");
+        console.error("Error updating product:", err);
+        return res.sendServerError("Error al actualizar producto: " + err.message);
     }
 };
 

@@ -8,7 +8,18 @@ const schema = new mongoose.Schema({
     code: String,
     price: {
         type: Number,
-        default: 0
+        default: 0,
+        validate: {
+            validator: function(v) {
+                // Allow null/undefined for products with variations
+                if (this.variations && this.variations.length > 0) {
+                    return v === null || v === undefined || !isNaN(v);
+                }
+                // Require valid number for products without variations
+                return v !== null && v !== undefined && !isNaN(v) && v >= 0;
+            },
+            message: 'Price must be a valid number'
+        }
     },
     // Backward-compatible category display name
     category: String,

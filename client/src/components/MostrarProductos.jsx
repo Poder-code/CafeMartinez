@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import Producto from "./Producto";
+import ComboEjecutivo from "./ComboEjecutivo";
 import "./css/mostrarProductos.css";
 
 export default function MostrarProductos() {
@@ -148,6 +149,20 @@ export default function MostrarProductos() {
                   <div className="menu-grid">
                     {subcatsDeCat.map((s) => {
                       const items = group.bySub[s._id] || [];
+                      
+                      // Special handling for Executive Menu combo
+                      if (c.name === "Menú Ejecutivo" && s.name === "Menú Ejecutivo") {
+                        return (
+                          <div key={s._id} className="subcat-block">
+                            <h3 className="subcat-title">{s.name}</h3>
+                            <div style={{ paddingTop: 8 }}>
+                              <ComboEjecutivo productos={items} />
+                            </div>
+                          </div>
+                        );
+                      }
+                      
+                      // Regular subcategory rendering
                       return (
                         <div key={s._id} className="subcat-block">
                           <h3 className="subcat-title">{s.name}</h3>

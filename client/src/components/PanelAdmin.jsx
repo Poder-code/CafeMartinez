@@ -116,7 +116,37 @@ const AdminPanel = () => {
       const formData = new FormData();
       formData.append("title", editedProduct.title);
       formData.append("description", editedProduct.description);
-      formData.append("price", editedProduct.price);
+      
+      // Handle price: if product has variations, don't send base price or calculate from variations
+      let priceToSend = editedProduct.price;
+      if (editedProduct.variations?.length > 0) {
+        // For products with variations, either use base price or calculate from variations
+        if (priceToSend && !isNaN(priceToSend) && priceToSend > 0) {
+          // Use existing base price if valid
+          formData.append("price", priceToSend);
+        } else {
+          // Calculate base price from variations (lowest price)
+          const validPrices = editedProduct.variations
+            .map(v => v.price || v.precio)
+            .filter(p => p && !isNaN(p) && p > 0);
+          
+          if (validPrices.length > 0) {
+            const minPrice = Math.min(...validPrices);
+            formData.append("price", minPrice);
+          } else {
+            // Don't send price if no valid prices found
+            formData.append("price", "");
+          }
+        }
+      } else {
+        // For products without variations, send the base price
+        if (priceToSend && !isNaN(priceToSend) && priceToSend >= 0) {
+          formData.append("price", priceToSend);
+        } else {
+          formData.append("price", "");
+        }
+      }
+      
       formData.append("code", editedProduct.code);
       formData.append("status", editedProduct.status);
 
@@ -159,7 +189,8 @@ const AdminPanel = () => {
       fetchProducts();
     } catch (err) {
       console.error("Error al actualizar producto:", err);
-      alert("Error al actualizar producto. Revisar cambios");
+      const errorMessage = err.message || "Error desconocido";
+      alert(`Error al actualizar producto: ${errorMessage}`);
     }
   };
 
