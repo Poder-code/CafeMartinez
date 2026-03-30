@@ -7,7 +7,7 @@ export default class ProductsRepository {
         return this.dao.get();
     }
     getProductsByCategory(category) {
-        return this.dao.getOne({ category: category });
+        return this.dao.get({ category: category });
     }
     getProductById(id) {
         return this.dao.getById({ _id: id });
